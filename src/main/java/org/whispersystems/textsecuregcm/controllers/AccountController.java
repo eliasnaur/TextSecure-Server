@@ -126,7 +126,7 @@ public class AccountController {
     } else if (transport.equals("voice")) {
       smsSender.deliverVoxVerification(number, verificationCode.getVerificationCodeSpeech());
 	} else if (transport.equals("id")) {
-		return Response.ok(verificationCode.getVerificationCodeDisplay(), "application/text").build();
+		return Response.ok(verificationCode, MediaType.APPLICATION_JSON).build();
     }
 
     return Response.ok().build();
