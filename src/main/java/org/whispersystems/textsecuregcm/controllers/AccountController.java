@@ -96,11 +96,10 @@ public class AccountController {
                                 @PathParam("number")    String number)
       throws IOException, RateLimitExceededException
   {
-    if (!Util.isValidNumber(number)) {
-      logger.debug("Invalid number: " + number);
-      throw new WebApplicationException(Response.status(400).build());
-    }
-
+	  if (!"id".equals(transport) && !Util.isValidNumber(number)) {
+		  logger.debug("Invalid number: " + number);
+		  throw new WebApplicationException(Response.status(400).build());
+	  }
     switch (transport) {
       case "sms":
         rateLimiters.getSmsDestinationLimiter().validate(number);
@@ -108,7 +107,12 @@ public class AccountController {
       case "voice":
         rateLimiters.getVoiceDestinationLimiter().validate(number);
         break;
-	  case "dev":
+	  case "id":
+		number = number.toLowerCase();
+		if (accounts.get(number).isPresent()) {
+		  logger.debug("ID account already exists: " + number);
+		  throw new WebApplicationException(Response.status(403).build());
+		}
 		break;
       default:
         throw new WebApplicationException(Response.status(422).build());
@@ -121,7 +125,7 @@ public class AccountController {
       smsSender.deliverSmsVerification(number, verificationCode.getVerificationCodeDisplay());
     } else if (transport.equals("voice")) {
       smsSender.deliverVoxVerification(number, verificationCode.getVerificationCodeSpeech());
-	} else if (transport.equals("dev")) {
+	} else if (transport.equals("id")) {
 		return Response.ok(verificationCode.getVerificationCodeDisplay(), "application/text").build();
     }
 
