@@ -208,6 +208,7 @@ public class AccountController {
   public void setGcmRegistrationId(@Auth Account account, @Valid GcmRegistrationId registrationId) {
     Device device = account.getAuthenticatedDevice().get();
     device.setApnId(null);
+    device.setVoipApnId(null);
     device.setGcmId(registrationId.getGcmRegistrationId());
 
     if (registrationId.isWebSocketChannel()) device.setFetchesMessages(true);
@@ -233,6 +234,7 @@ public class AccountController {
   public void setApnRegistrationId(@Auth Account account, @Valid ApnRegistrationId registrationId) {
     Device device = account.getAuthenticatedDevice().get();
     device.setApnId(registrationId.getApnRegistrationId());
+    device.setVoipApnId(registrationId.getVoipRegistrationId());
     device.setGcmId(null);
     device.setFetchesMessages(true);
     accounts.update(account);

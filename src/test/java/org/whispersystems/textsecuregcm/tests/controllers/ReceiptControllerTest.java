@@ -6,28 +6,21 @@ import com.sun.jersey.api.client.ClientResponse;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.whispersystems.textsecuregcm.controllers.MessageController;
 import org.whispersystems.textsecuregcm.controllers.ReceiptController;
 import org.whispersystems.textsecuregcm.entities.MessageProtos;
 import org.whispersystems.textsecuregcm.federation.FederatedClientManager;
-import org.whispersystems.textsecuregcm.limits.RateLimiter;
-import org.whispersystems.textsecuregcm.limits.RateLimiters;
 import org.whispersystems.textsecuregcm.push.PushSender;
+import org.whispersystems.textsecuregcm.push.ReceiptSender;
 import org.whispersystems.textsecuregcm.storage.Account;
 import org.whispersystems.textsecuregcm.storage.AccountsManager;
 import org.whispersystems.textsecuregcm.storage.Device;
 import org.whispersystems.textsecuregcm.tests.util.AuthHelper;
 
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import io.dropwizard.testing.junit.ResourceTestRule;
 import static org.fest.assertions.api.Assertions.assertThat;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.core.IsEqual.equalTo;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -40,23 +33,25 @@ public class ReceiptControllerTest  {
   private  final FederatedClientManager federatedClientManager = mock(FederatedClientManager.class);
   private  final AccountsManager        accountsManager        = mock(AccountsManager.class       );
 
+  private final ReceiptSender receiptSender = new ReceiptSender(accountsManager, pushSender, federatedClientManager);
+
   private  final ObjectMapper mapper = new ObjectMapper();
 
   @Rule
   public final ResourceTestRule resources = ResourceTestRule.builder()
                                                             .addProvider(AuthHelper.getAuthenticator())
-                                                            .addResource(new ReceiptController(accountsManager, federatedClientManager, pushSender))
+                                                            .addResource(new ReceiptController(receiptSender))
                                                             .build();
 
   @Before
   public void setup() throws Exception {
     Set<Device> singleDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, false, 111, null, System.currentTimeMillis()));
+      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 111, null, System.currentTimeMillis()));
     }};
 
     Set<Device> multiDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, false, 222, null, System.currentTimeMillis()));
-      add(new Device(2, "foo", "bar", "baz", "isgcm", null, false, 333, null, System.currentTimeMillis()));
+      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 222, null, System.currentTimeMillis()));
+      add(new Device(2, "foo", "bar", "baz", "isgcm", null, null, false, 333, null, System.currentTimeMillis()));
     }};
 
     Account singleDeviceAccount = new Account(SINGLE_DEVICE_RECIPIENT, false, singleDeviceList);

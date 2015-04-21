@@ -25,7 +25,14 @@ public class ApnRegistrationId {
   @NotEmpty
   private String apnRegistrationId;
 
+  @JsonProperty
+  private String voipRegistrationId;
+
   public String getApnRegistrationId() {
     return apnRegistrationId;
+  }
+
+  public String getVoipRegistrationId() {
+    return voipRegistrationId;
   }
 }
