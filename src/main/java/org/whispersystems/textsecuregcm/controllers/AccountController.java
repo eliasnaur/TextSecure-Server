@@ -108,7 +108,6 @@ public class AccountController {
         rateLimiters.getVoiceDestinationLimiter().validate(number);
         break;
 	  case "id":
-		number = number.toLowerCase();
 		if (accounts.get(number).isPresent()) {
 		  logger.debug("ID account already exists: " + number);
 		  throw new WebApplicationException(Response.status(403).build());
