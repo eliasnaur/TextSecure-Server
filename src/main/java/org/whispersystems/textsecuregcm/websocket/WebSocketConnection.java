@@ -25,6 +25,7 @@ import org.whispersystems.websocket.messages.WebSocketResponseMessage;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.ws.rs.WebApplicationException;
 import java.io.IOException;
 import java.util.List;
 
@@ -136,8 +137,10 @@ public class WebSocketConnection implements DispatchChannel {
       receiptSender.sendReceipt(account, message.getSource(), message.getTimestamp(),
                                 message.hasRelay() ? Optional.of(message.getRelay()) :
                                                      Optional.<String>absent());
-    } catch (IOException | NoSuchUserException | TransientPushFailureException | NotPushRegisteredException e) {
+    } catch (IOException | NoSuchUserException | TransientPushFailureException | NotPushRegisteredException  e) {
       logger.warn("sendDeliveryReceiptFor", e);
+    } catch (WebApplicationException e) {
+      logger.warn("Bad federated response for receipt: " + e.getResponse().getStatus());
     }
   }
 
