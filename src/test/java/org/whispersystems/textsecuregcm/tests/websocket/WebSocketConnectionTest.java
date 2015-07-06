@@ -5,11 +5,11 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import org.eclipse.jetty.websocket.api.UpgradeRequest;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.whispersystems.textsecuregcm.auth.AccountAuthenticator;
 import org.whispersystems.textsecuregcm.entities.OutgoingMessageEntity;
+import org.whispersystems.textsecuregcm.push.ApnFallbackManager;
 import org.whispersystems.textsecuregcm.push.PushSender;
 import org.whispersystems.textsecuregcm.push.ReceiptSender;
 import org.whispersystems.textsecuregcm.storage.Account;
@@ -19,7 +19,6 @@ import org.whispersystems.textsecuregcm.storage.MessagesManager;
 import org.whispersystems.textsecuregcm.storage.PubSubManager;
 import org.whispersystems.textsecuregcm.storage.PubSubProtos;
 import org.whispersystems.textsecuregcm.util.Base64;
-import org.whispersystems.textsecuregcm.util.Pair;
 import org.whispersystems.textsecuregcm.websocket.AuthenticatedConnectListener;
 import org.whispersystems.textsecuregcm.websocket.WebSocketAccountAuthenticator;
 import org.whispersystems.textsecuregcm.websocket.WebSocketConnection;
@@ -27,7 +26,6 @@ import org.whispersystems.textsecuregcm.websocket.WebsocketAddress;
 import org.whispersystems.websocket.WebSocketClient;
 import org.whispersystems.websocket.messages.WebSocketResponseMessage;
 import org.whispersystems.websocket.session.WebSocketSessionContext;
-import org.whispersystems.websocket.setup.WebSocketConnectListener;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -37,12 +35,10 @@ import java.util.List;
 import java.util.Set;
 
 import io.dropwizard.auth.basic.BasicCredentials;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.*;
-import static org.whispersystems.textsecuregcm.entities.MessageProtos.OutgoingMessageSignal;
+import static org.whispersystems.textsecuregcm.entities.MessageProtos.Envelope;
 
 public class WebSocketConnectionTest {
 
@@ -60,12 +56,13 @@ public class WebSocketConnectionTest {
   private static final UpgradeRequest       upgradeRequest       = mock(UpgradeRequest.class      );
   private static final PushSender           pushSender           = mock(PushSender.class);
   private static final ReceiptSender        receiptSender        = mock(ReceiptSender.class);
+  private static final ApnFallbackManager   apnFallbackManager   = mock(ApnFallbackManager.class);
 
   @Test
   public void testCredentials() throws Exception {
     MessagesManager               storedMessages         = mock(MessagesManager.class);
     WebSocketAccountAuthenticator webSocketAuthenticator = new WebSocketAccountAuthenticator(accountAuthenticator);
-    AuthenticatedConnectListener  connectListener        = new AuthenticatedConnectListener(accountsManager, pushSender, receiptSender, storedMessages, pubSubManager);
+    AuthenticatedConnectListener  connectListener        = new AuthenticatedConnectListener(accountsManager, pushSender, receiptSender, storedMessages, pubSubManager, apnFallbackManager);
     WebSocketSessionContext       sessionContext         = mock(WebSocketSessionContext.class);
 
     when(accountAuthenticator.authenticate(eq(new BasicCredentials(VALID_USER, VALID_PASSWORD))))
@@ -167,21 +164,21 @@ public class WebSocketConnectionTest {
   @Test
   public void testOnlineSend() throws Exception {
     MessagesManager storedMessages = mock(MessagesManager.class);
-    OutgoingMessageSignal firstMessage = OutgoingMessageSignal.newBuilder()
-                                                              .setMessage(ByteString.copyFrom("first".getBytes()))
-                                                              .setSource("sender1")
-                                                              .setTimestamp(System.currentTimeMillis())
-                                                              .setSourceDevice(1)
-                                                              .setType(OutgoingMessageSignal.Type.CIPHERTEXT_VALUE)
-                                                              .build();
+    Envelope firstMessage = Envelope.newBuilder()
+                                    .setLegacyMessage(ByteString.copyFrom("first".getBytes()))
+                                    .setSource("sender1")
+                                    .setTimestamp(System.currentTimeMillis())
+                                    .setSourceDevice(1)
+                                    .setType(Envelope.Type.CIPHERTEXT)
+                                    .build();
 
-    OutgoingMessageSignal secondMessage = OutgoingMessageSignal.newBuilder()
-                                                               .setMessage(ByteString.copyFrom("second".getBytes()))
-                                                               .setSource("sender2")
-                                                               .setTimestamp(System.currentTimeMillis())
-                                                               .setSourceDevice(2)
-                                                               .setType(OutgoingMessageSignal.Type.CIPHERTEXT_VALUE)
-                                                               .build();
+    Envelope secondMessage = Envelope.newBuilder()
+                                     .setLegacyMessage(ByteString.copyFrom("second".getBytes()))
+                                     .setSource("sender2")
+                                     .setTimestamp(System.currentTimeMillis())
+                                     .setSourceDevice(2)
+                                     .setType(Envelope.Type.CIPHERTEXT)
+                                     .build();
 
     List<OutgoingMessageEntity> pendingMessages = new LinkedList<>();
 
@@ -244,15 +241,15 @@ public class WebSocketConnectionTest {
     futures.get(0).setException(new IOException());
 
     verify(receiptSender, times(1)).sendReceipt(eq(account), eq("sender2"), eq(secondMessage.getTimestamp()), eq(Optional.<String>absent()));
-    verify(pushSender, times(1)).sendMessage(eq(account), eq(device), any(OutgoingMessageSignal.class));
+    verify(pushSender, times(1)).sendMessage(eq(account), eq(device), any(Envelope.class));
 
     connection.onDispatchUnsubscribed(websocketAddress.serialize());
     verify(client).close(anyInt(), anyString());
   }
 
   private OutgoingMessageEntity createMessage(long id, String sender, long timestamp, boolean receipt, String content) {
-    return new OutgoingMessageEntity(id, receipt ? OutgoingMessageSignal.Type.RECEIPT_VALUE : OutgoingMessageSignal.Type.CIPHERTEXT_VALUE,
-                                     null, timestamp, sender, 1, content.getBytes());
+    return new OutgoingMessageEntity(id, receipt ? Envelope.Type.RECEIPT_VALUE : Envelope.Type.CIPHERTEXT_VALUE,
+                                     null, timestamp, sender, 1, content.getBytes(), null);
   }
 
 }

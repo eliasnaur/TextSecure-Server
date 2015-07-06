@@ -22,6 +22,8 @@ import org.whispersystems.textsecuregcm.tests.util.AuthHelper;
 
 import javax.ws.rs.core.MediaType;
 
+import java.util.HashMap;
+
 import io.dropwizard.testing.junit.ResourceTestRule;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.Matchers.anyString;
@@ -49,7 +51,8 @@ public class AccountControllerTest {
                                                                                                smsSender,
                                                                                                storedMessages,
                                                                                                timeProvider,
-                                                                                               Optional.of(authorizationKey)))
+                                                                                               Optional.of(authorizationKey),
+                                                                                               new HashMap<String, Integer>()))
                                                             .build();
 
 
@@ -80,7 +83,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/code/%s", "1234"))
             .header("Authorization", AuthHelper.getAuthHeader(SENDER, "bar"))
-            .entity(new AccountAttributes("keykeykeykey", false, false, 2222))
+            .entity(new AccountAttributes("keykeykeykey", false, 2222))
             .type(MediaType.APPLICATION_JSON_TYPE)
             .put(ClientResponse.class);
 
@@ -94,7 +97,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/code/%s", "1111"))
             .header("Authorization", AuthHelper.getAuthHeader(SENDER, "bar"))
-            .entity(new AccountAttributes("keykeykeykey", false, false, 3333))
+            .entity(new AccountAttributes("keykeykeykey", false, 3333))
             .type(MediaType.APPLICATION_JSON_TYPE)
             .put(ClientResponse.class);
 
@@ -112,7 +115,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/token/%s", token))
         .header("Authorization", AuthHelper.getAuthHeader(SENDER, "bar"))
-        .entity(new AccountAttributes("keykeykeykey", false, false, 4444))
+        .entity(new AccountAttributes("keykeykeykey", false, 4444))
         .type(MediaType.APPLICATION_JSON_TYPE)
         .put(ClientResponse.class);
 
@@ -130,7 +133,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/token/%s", token))
                  .header("Authorization", AuthHelper.getAuthHeader(SENDER, "bar"))
-                 .entity(new AccountAttributes("keykeykeykey", false, false, 4444))
+                 .entity(new AccountAttributes("keykeykeykey", false, 4444))
                  .type(MediaType.APPLICATION_JSON_TYPE)
                  .put(ClientResponse.class);
 
@@ -148,7 +151,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/token/%s", token))
                  .header("Authorization", AuthHelper.getAuthHeader("+14151111111", "bar"))
-                 .entity(new AccountAttributes("keykeykeykey", false, false, 4444))
+                 .entity(new AccountAttributes("keykeykeykey", false, 4444))
                  .type(MediaType.APPLICATION_JSON_TYPE)
                  .put(ClientResponse.class);
 
@@ -166,7 +169,7 @@ public class AccountControllerTest {
     ClientResponse response =
         resources.client().resource(String.format("/v1/accounts/token/%s", token))
                  .header("Authorization", AuthHelper.getAuthHeader(SENDER, "bar"))
-                 .entity(new AccountAttributes("keykeykeykey", false, false, 4444))
+                 .entity(new AccountAttributes("keykeykeykey", false, 4444))
                  .type(MediaType.APPLICATION_JSON_TYPE)
                  .put(ClientResponse.class);
 

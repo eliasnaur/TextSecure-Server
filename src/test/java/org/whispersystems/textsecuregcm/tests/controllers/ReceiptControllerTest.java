@@ -8,6 +8,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.whispersystems.textsecuregcm.controllers.ReceiptController;
 import org.whispersystems.textsecuregcm.entities.MessageProtos;
+import org.whispersystems.textsecuregcm.entities.MessageProtos.Envelope;
 import org.whispersystems.textsecuregcm.federation.FederatedClientManager;
 import org.whispersystems.textsecuregcm.push.PushSender;
 import org.whispersystems.textsecuregcm.push.ReceiptSender;
@@ -46,16 +47,16 @@ public class ReceiptControllerTest  {
   @Before
   public void setup() throws Exception {
     Set<Device> singleDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 111, null, System.currentTimeMillis()));
+      add(new Device(1, null, "foo", "bar", "baz", "isgcm", null, null, false, 111, null, System.currentTimeMillis(), System.currentTimeMillis()));
     }};
 
     Set<Device> multiDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 222, null, System.currentTimeMillis()));
-      add(new Device(2, "foo", "bar", "baz", "isgcm", null, null, false, 333, null, System.currentTimeMillis()));
+      add(new Device(1, null, "foo", "bar", "baz", "isgcm", null, null, false, 222, null, System.currentTimeMillis(), System.currentTimeMillis()));
+      add(new Device(2, null, "foo", "bar", "baz", "isgcm", null, null, false, 333, null, System.currentTimeMillis(), System.currentTimeMillis()));
     }};
 
-    Account singleDeviceAccount = new Account(SINGLE_DEVICE_RECIPIENT, false, singleDeviceList);
-    Account multiDeviceAccount  = new Account(MULTI_DEVICE_RECIPIENT, false, multiDeviceList);
+    Account singleDeviceAccount = new Account(SINGLE_DEVICE_RECIPIENT, singleDeviceList);
+    Account multiDeviceAccount  = new Account(MULTI_DEVICE_RECIPIENT, multiDeviceList);
 
     when(accountsManager.get(eq(SINGLE_DEVICE_RECIPIENT))).thenReturn(Optional.of(singleDeviceAccount));
     when(accountsManager.get(eq(MULTI_DEVICE_RECIPIENT))).thenReturn(Optional.of(multiDeviceAccount));
@@ -70,7 +71,7 @@ public class ReceiptControllerTest  {
 
     assertThat(response.getStatus() == 204);
 
-    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(MessageProtos.OutgoingMessageSignal.class));
+    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(Envelope.class));
   }
 
   @Test
@@ -82,7 +83,7 @@ public class ReceiptControllerTest  {
 
     assertThat(response.getStatus() == 204);
 
-    verify(pushSender, times(2)).sendMessage(any(Account.class), any(Device.class), any(MessageProtos.OutgoingMessageSignal.class));
+    verify(pushSender, times(2)).sendMessage(any(Account.class), any(Device.class), any(Envelope.class));
   }
 
 

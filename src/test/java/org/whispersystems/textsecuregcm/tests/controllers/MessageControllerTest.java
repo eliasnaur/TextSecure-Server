@@ -3,13 +3,12 @@ package org.whispersystems.textsecuregcm.tests.controllers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.sun.jersey.api.client.ClientResponse;
-import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.whispersystems.textsecuregcm.controllers.MessageController;
 import org.whispersystems.textsecuregcm.entities.IncomingMessageList;
-import org.whispersystems.textsecuregcm.entities.MessageProtos;
+import org.whispersystems.textsecuregcm.entities.MessageProtos.Envelope;
 import org.whispersystems.textsecuregcm.entities.MismatchedDevices;
 import org.whispersystems.textsecuregcm.entities.OutgoingMessageEntity;
 import org.whispersystems.textsecuregcm.entities.OutgoingMessageEntityList;
@@ -25,7 +24,6 @@ import org.whispersystems.textsecuregcm.storage.AccountsManager;
 import org.whispersystems.textsecuregcm.storage.Device;
 import org.whispersystems.textsecuregcm.storage.MessagesManager;
 import org.whispersystems.textsecuregcm.tests.util.AuthHelper;
-import org.whispersystems.textsecuregcm.util.SystemMapper;
 
 import javax.ws.rs.core.MediaType;
 import java.util.HashSet;
@@ -71,17 +69,17 @@ public class MessageControllerTest {
   @Before
   public void setup() throws Exception {
     Set<Device> singleDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 111, null, System.currentTimeMillis()));
+      add(new Device(1, null, "foo", "bar", "baz", "isgcm", null, null, false, 111, null, System.currentTimeMillis(), System.currentTimeMillis()));
     }};
 
     Set<Device> multiDeviceList = new HashSet<Device>() {{
-      add(new Device(1, "foo", "bar", "baz", "isgcm", null, null, false, 222, new SignedPreKey(111, "foo", "bar"), System.currentTimeMillis()));
-      add(new Device(2, "foo", "bar", "baz", "isgcm", null, null, false, 333, new SignedPreKey(222, "oof", "rab"), System.currentTimeMillis()));
-      add(new Device(3, "foo", "bar", "baz", "isgcm", null, null, false, 444, null, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(31)));
+      add(new Device(1, null, "foo", "bar", "baz", "isgcm", null, null, false, 222, new SignedPreKey(111, "foo", "bar"), System.currentTimeMillis(), System.currentTimeMillis()));
+      add(new Device(2, null, "foo", "bar", "baz", "isgcm", null, null, false, 333, new SignedPreKey(222, "oof", "rab"), System.currentTimeMillis(), System.currentTimeMillis()));
+      add(new Device(3, null, "foo", "bar", "baz", "isgcm", null, null, false, 444, null, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(31), System.currentTimeMillis()));
     }};
 
-    Account singleDeviceAccount = new Account(SINGLE_DEVICE_RECIPIENT, false, singleDeviceList);
-    Account multiDeviceAccount  = new Account(MULTI_DEVICE_RECIPIENT, false, multiDeviceList);
+    Account singleDeviceAccount = new Account(SINGLE_DEVICE_RECIPIENT, singleDeviceList);
+    Account multiDeviceAccount  = new Account(MULTI_DEVICE_RECIPIENT, multiDeviceList);
 
     when(accountsManager.get(eq(SINGLE_DEVICE_RECIPIENT))).thenReturn(Optional.of(singleDeviceAccount));
     when(accountsManager.get(eq(MULTI_DEVICE_RECIPIENT))).thenReturn(Optional.of(multiDeviceAccount));
@@ -100,7 +98,7 @@ public class MessageControllerTest {
 
     assertThat("Good Response", response.getStatus(), is(equalTo(200)));
 
-    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(MessageProtos.OutgoingMessageSignal.class));
+    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(Envelope.class));
   }
 
   @Test
@@ -114,7 +112,7 @@ public class MessageControllerTest {
 
     assertThat("Good Response", response.getStatus(), is(equalTo(200)));
 
-    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(MessageProtos.OutgoingMessageSignal.class));
+    verify(pushSender, times(1)).sendMessage(any(Account.class), any(Device.class), any(Envelope.class));
   }
 
   @Test
@@ -164,7 +162,7 @@ public class MessageControllerTest {
 
     assertThat("Good Response Code", response.getStatus(), is(equalTo(200)));
 
-    verify(pushSender, times(2)).sendMessage(any(Account.class), any(Device.class), any(MessageProtos.OutgoingMessageSignal.class));
+    verify(pushSender, times(2)).sendMessage(any(Account.class), any(Device.class), any(Envelope.class));
   }
 
   @Test
@@ -193,8 +191,8 @@ public class MessageControllerTest {
     final long timestampTwo = 313388;
 
     List<OutgoingMessageEntity> messages = new LinkedList<OutgoingMessageEntity>() {{
-      add(new OutgoingMessageEntity(1L, MessageProtos.OutgoingMessageSignal.Type.CIPHERTEXT_VALUE, null, timestampOne, "+14152222222", 2, "hi there".getBytes()));
-      add(new OutgoingMessageEntity(2L, MessageProtos.OutgoingMessageSignal.Type.RECEIPT_VALUE, null, timestampTwo, "+14152222222", 2, null));
+      add(new OutgoingMessageEntity(1L, Envelope.Type.CIPHERTEXT_VALUE, null, timestampOne, "+14152222222", 2, "hi there".getBytes(), null));
+      add(new OutgoingMessageEntity(2L, Envelope.Type.RECEIPT_VALUE, null, timestampTwo, "+14152222222", 2, null, null));
     }};
 
     when(messagesManager.getMessagesForDevice(eq(AuthHelper.VALID_NUMBER), eq(1L))).thenReturn(messages);
@@ -220,15 +218,15 @@ public class MessageControllerTest {
     long timestamp = System.currentTimeMillis();
     when(messagesManager.delete(AuthHelper.VALID_NUMBER, "+14152222222", 31337))
         .thenReturn(Optional.of(new OutgoingMessageEntity(31337L,
-                                                          MessageProtos.OutgoingMessageSignal.Type.CIPHERTEXT_VALUE,
+                                                          Envelope.Type.CIPHERTEXT_VALUE,
                                                           null, timestamp,
-                                                          "+14152222222", 1, "hi".getBytes())));
+                                                          "+14152222222", 1, "hi".getBytes(), null)));
 
     when(messagesManager.delete(AuthHelper.VALID_NUMBER, "+14152222222", 31338))
         .thenReturn(Optional.of(new OutgoingMessageEntity(31337L,
-                                                          MessageProtos.OutgoingMessageSignal.Type.RECEIPT_VALUE,
+                                                          Envelope.Type.RECEIPT_VALUE,
                                                           null, System.currentTimeMillis(),
-                                                          "+14152222222", 1, null)));
+                                                          "+14152222222", 1, null, null)));
 
 
     when(messagesManager.delete(AuthHelper.VALID_NUMBER, "+14152222222", 31339))

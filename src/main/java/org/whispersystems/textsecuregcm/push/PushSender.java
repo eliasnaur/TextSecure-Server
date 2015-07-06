@@ -22,12 +22,16 @@ import org.whispersystems.textsecuregcm.entities.ApnMessage;
 import org.whispersystems.textsecuregcm.entities.CryptoEncodingException;
 import org.whispersystems.textsecuregcm.entities.EncryptedOutgoingMessage;
 import org.whispersystems.textsecuregcm.entities.GcmMessage;
+import org.whispersystems.textsecuregcm.push.ApnFallbackManager.ApnFallbackTask;
 import org.whispersystems.textsecuregcm.push.WebsocketSender.DeliveryStatus;
 import org.whispersystems.textsecuregcm.storage.Account;
 import org.whispersystems.textsecuregcm.storage.Device;
 import org.whispersystems.textsecuregcm.util.Util;
+import org.whispersystems.textsecuregcm.websocket.WebsocketAddress;
 
-import static org.whispersystems.textsecuregcm.entities.MessageProtos.OutgoingMessageSignal;
+import java.util.concurrent.TimeUnit;
+
+import static org.whispersystems.textsecuregcm.entities.MessageProtos.Envelope;
 
 public class PushSender {
 
@@ -35,15 +39,17 @@ public class PushSender {
 
   private static final String APN_PAYLOAD = "{\"aps\":{\"sound\":\"default\",\"badge\":%d,\"alert\":{\"loc-key\":\"APN_Message\"}}}";
 
-  private final PushServiceClient pushServiceClient;
-  private final WebsocketSender   webSocketSender;
+  private final ApnFallbackManager apnFallbackManager;
+  private final PushServiceClient  pushServiceClient;
+  private final WebsocketSender    webSocketSender;
 
-  public PushSender(PushServiceClient pushServiceClient, WebsocketSender websocketSender) {
-    this.pushServiceClient = pushServiceClient;
-    this.webSocketSender   = websocketSender;
+  public PushSender(ApnFallbackManager apnFallbackManager, PushServiceClient pushServiceClient, WebsocketSender websocketSender) {
+    this.apnFallbackManager = apnFallbackManager;
+    this.pushServiceClient  = pushServiceClient;
+    this.webSocketSender    = websocketSender;
   }
 
-  public void sendMessage(Account account, Device device, OutgoingMessageSignal message)
+  public void sendMessage(Account account, Device device, Envelope message)
       throws NotPushRegisteredException, TransientPushFailureException
   {
     if      (device.getGcmId() != null)   sendGcmMessage(account, device, message);
@@ -56,21 +62,21 @@ public class PushSender {
     return webSocketSender;
   }
 
-  private void sendGcmMessage(Account account, Device device, OutgoingMessageSignal message)
+  private void sendGcmMessage(Account account, Device device, Envelope message)
       throws TransientPushFailureException, NotPushRegisteredException
   {
     if (device.getFetchesMessages()) sendNotificationGcmMessage(account, device, message);
     else                             sendPayloadGcmMessage(account, device, message);
   }
 
-  private void sendPayloadGcmMessage(Account account, Device device, OutgoingMessageSignal message)
+  private void sendPayloadGcmMessage(Account account, Device device, Envelope message)
       throws TransientPushFailureException, NotPushRegisteredException
   {
     try {
       String                   number           = account.getNumber();
       long                     deviceId         = device.getId();
       String                   registrationId   = device.getGcmId();
-      boolean                  isReceipt        = message.getType() == OutgoingMessageSignal.Type.RECEIPT_VALUE;
+      boolean                  isReceipt        = message.getType() == Envelope.Type.RECEIPT;
       EncryptedOutgoingMessage encryptedMessage = new EncryptedOutgoingMessage(message, device.getSignalingKey());
       GcmMessage               gcmMessage       = new GcmMessage(registrationId, number, (int) deviceId,
                                                                  encryptedMessage.toEncodedString(), isReceipt, false);
@@ -81,7 +87,7 @@ public class PushSender {
     }
   }
 
-  private void sendNotificationGcmMessage(Account account, Device device, OutgoingMessageSignal message)
+  private void sendNotificationGcmMessage(Account account, Device device, Envelope message)
       throws TransientPushFailureException
   {
     DeliveryStatus deliveryStatus = webSocketSender.sendMessage(account, device, message, WebsocketSender.Type.GCM);
@@ -94,23 +100,32 @@ public class PushSender {
     }
   }
 
-  private void sendApnMessage(Account account, Device device, OutgoingMessageSignal outgoingMessage)
+  private void sendApnMessage(Account account, Device device, Envelope outgoingMessage)
       throws TransientPushFailureException
   {
     DeliveryStatus deliveryStatus = webSocketSender.sendMessage(account, device, outgoingMessage, WebsocketSender.Type.APN);
 
-    if (!deliveryStatus.isDelivered() && outgoingMessage.getType() != OutgoingMessageSignal.Type.RECEIPT_VALUE) {
-      String  apnId  = Util.isEmpty(device.getVoipApnId()) ? device.getApnId() : device.getVoipApnId();
-      boolean isVoip = !Util.isEmpty(device.getVoipApnId());
+    if (!deliveryStatus.isDelivered() && outgoingMessage.getType() != Envelope.Type.RECEIPT) {
+      ApnMessage apnMessage;
 
-      ApnMessage apnMessage = new ApnMessage(apnId, account.getNumber(), (int)device.getId(),
-                                             String.format(APN_PAYLOAD, deliveryStatus.getMessageQueueDepth()),
-                                             isVoip);
+      if (!Util.isEmpty(device.getVoipApnId())) {
+        apnMessage = new ApnMessage(device.getVoipApnId(), account.getNumber(), (int)device.getId(),
+                                    String.format(APN_PAYLOAD, deliveryStatus.getMessageQueueDepth()),
+                                    true, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(30));
+
+        apnFallbackManager.schedule(new WebsocketAddress(account.getNumber(), device.getId()),
+                                    new ApnFallbackTask(device.getApnId(), apnMessage));
+      } else {
+        apnMessage = new ApnMessage(device.getApnId(), account.getNumber(), (int)device.getId(),
+                                    String.format(APN_PAYLOAD, deliveryStatus.getMessageQueueDepth()),
+                                    false, ApnMessage.MAX_EXPIRATION);
+      }
+
       pushServiceClient.send(apnMessage);
     }
   }
 
-  private void sendWebSocketMessage(Account account, Device device, OutgoingMessageSignal outgoingMessage)
+  private void sendWebSocketMessage(Account account, Device device, Envelope outgoingMessage)
   {
     webSocketSender.sendMessage(account, device, outgoingMessage, WebsocketSender.Type.WEB);
   }

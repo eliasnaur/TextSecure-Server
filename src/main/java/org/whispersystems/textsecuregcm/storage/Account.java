@@ -33,9 +33,6 @@ public class Account {
   private String number;
 
   @JsonProperty
-  private boolean supportsSms;
-
-  @JsonProperty
   private Set<Device> devices = new HashSet<>();
 
   @JsonProperty
@@ -47,10 +44,9 @@ public class Account {
   public Account() {}
 
   @VisibleForTesting
-  public Account(String number, boolean supportsSms, Set<Device> devices) {
-    this.number      = number;
-    this.supportsSms = supportsSms;
-    this.devices     = devices;
+  public Account(String number, Set<Device> devices) {
+    this.number  = number;
+    this.devices = devices;
   }
 
   public Optional<Device> getAuthenticatedDevice() {
@@ -69,17 +65,13 @@ public class Account {
     return number;
   }
 
-  public boolean getSupportsSms() {
-    return supportsSms;
-  }
-
-  public void setSupportsSms(boolean supportsSms) {
-    this.supportsSms = supportsSms;
-  }
-
   public void addDevice(Device device) {
     this.devices.remove(device);
     this.devices.add(device);
+  }
+
+  public void removeDevice(long deviceId) {
+    this.devices.remove(new Device(deviceId, null, null, null, null, null, null, null, false, 0, null, 0, 0));
   }
 
   public Set<Device> getDevices() {
